@@ -1,190 +1,202 @@
-'use strict';
+"use strict";
 
-// prep
-var gameDiv = document.querySelector('#game-div');
-var canvasEl = document.querySelector('#game-canvas');
-var canvas = canvasEl.getContext('2d');
-canvasEl.setAttribute('tabindex', '1');
-var width = canvasEl.width;
-var height = canvasEl.height;
+// breakout
 
-// camera
-var camera = {
-	center: {x: 0, y: 0},
-	size: {x: width, y: height},
-	moveTo: function(pos) {
-		this.center.x = pos.x;
-		this.center.y = pos.y;
-	},
-	moveBy: function(offset) {
-		this.center.x += offset.x;
-		this.center.y += offset.y;
-	},
-	convert: function(pos) {
-		var converted = {x: -this.center.x + pos.x + this.size.x/2,
-			y: -this.center.y + pos.y + this.size.y/2};
-		return converted;
-	},
-};
+var keyboardState = {}
 
-// objects
-function Unit(pos) {
-		this.pos = pos;
-		this.size = 10;
-		this.color = 'rgb(' + Math.floor(Math.random()*255) + ',' + Math.floor(Math.random()*255) + ',' + Math.floor(Math.random()*255) + ')';
-}
-
-Unit.prototype.render = function() {
-	canvas.save();
-	canvas.beginPath();
-	canvas.fillStyle = this.color;
-	var camPos = camera.convert(this.pos);
-	canvas.arc(camPos.x, camPos.y, this.size, 0, Math.PI*2, false);
-	canvas.closePath();
-	canvas.fill();
-	canvas.restore();
-}
-
-// main
-// .clearRect, .strokeRect, fillRect
-// beginPath() moveTo()
-//closePath() stroke() fill()
-// arc(x, y, startAngle, endAngle) arcTo(x1, y1, x2, y2, radius)
-
-//canvas.fillStyle = "rgb(200,0,0)";
-//canvas.fillRect(10, 10, 55, 50);
-
-//canvas.fillStyle = "rgba(0, 0, 200, 0.5)";
-//canvas.fillRect (30, 30, 55, 50);
-
-var max = 2;
-var min = -2;
-
-var objects = [];
-for (var i = 0; i < 20; i++) {
-	for (var j = 0; j < 400; j++) {
-		var myUnit = new Unit({x: j*40 + Math.random()*(max-min) + min,
-			y: i*30 + Math.random()*(max-min) + min});
-
-		//var myUnit = new Unit({x: j*40, y: i*30 +min});
-		objects.push(myUnit);
-	}
-}
-
-// basic canvas
-(function draw() {
-	clear();
-	for (var object of objects) { // let?
-		canvas.save()
-		object.render();
-		canvas.restore();
-	}
-
-	canvas.save()
-	canvas.fillStyle = "black";
-	canvas.shadowColor = "red";
-	canvas.shadowOffsetX = 3;
-	canvas.shadowOffsetY = 3;
-	canvas.shadowBlur = 1;
-	canvas.font = "48px serif";
-	canvas.textBaseline = "middle";
-	canvas.fillText("test", width * 0.1, height * 0.9);
-	canvas.restore();
-
-	requestAnimationFrame(draw);
-})();
-
-//.textAlign(start end left right center)
-
-function clear() {
-	canvas.save();
-	canvas.fillStyle = "green";
-	canvas.fillRect(0, 0, width, height);
-	//canvas.fillStyle="red";
-	//canvas.strokeRect(0, 0, width, height);
-	canvas.restore();
-}
-
-// key stuff
-// wasd 119 97 115 100
-// a list of actions and the associated key
-var controlKeys = {
-	cameraUp: 119,
-	cameraLeft: 97,
-	cameraDown: 115,
-	cameraRight: 100,
-}
-
-// reverse of controlKeys, keyCode is key, behavior is value
-var keybindings = {}
-for (var key in controlKeys) { // let?
-	keybindings[controlKeys[key]] = key;
-}
-
-// events
-canvasEl.addEventListener('keypress', function (event) {
-	console.log('keypress', event.keyCode);
-	if (keybindings[event.keyCode]) {
-		console.log('control');
-	} else {
-		console.log('no control');
-	}
-});
-
-canvasEl.addEventListener('click', function (event) {
-	event.target.focus();
-});
-
-var focus;
-canvasEl.addEventListener('focus', function(event) {
-	console.log('focus');
-	focus = true;
-	// lock the pointer
-	canvasEl.requestPointerLock =
-		canvasEl.requestPointerLock ||
-		canvasEl.mozRequestPointerLock ||
-		canvasEl.webkitRequestPointerLock;
-	canvasEl.requestPointerLock()
-});
-
-canvasEl.addEventListener( 'blur', function( event ) {
-	console.log( 'blur' )
-	focus = false
-	// release the pointer
-	// canvasEl.exitPointerLock =
-	// 	canvasEl.exitPointerLock ||
-	// 	canvasEl.mozExitPointerLock ||
-	// 	canvasEl.webkitExitPointerLock
-	// canvasEl.exitPointerLock()
-} )
-
-canvasEl.addEventListener('mousemove', function (event) {
-	//if (document.hasFocus()) {
-	if ( focus ) {
-		camera.moveBy({x: event.movementX, y: event.movementY});
-	} else {
-		//console.log('null mouseover');
-	}
+document.addEventListener("keydown", function (e) {
+	keyboardState[e.key] = true
 })
 
+document.addEventListener("keyup", function (e) {
+	keyboardState[e.key] = false
+	// console.log(keyboardState)
+})
 
-(function onResize() {
-	canvasEl.width = window.innerWidth
-	canvasEl.height = window.innerHeight
-	console.log( 'resize' )
-}())
+var canvas = document.getElementById("game-canvas");
+var ctx = canvas.getContext("2d");
 
-window.addEventListener( 'resize', onResize, false )
+function rect(x, y, width, height, stroke = false) {
+	ctx.beginPath();
 
-function pointerLockChange( e ) {
-	if ( document.pointerLockElement === canvasEl ) {
-		console.log('pointer locked');
-		canvasEl.focus();
-
+	// 10, 10, 20, 20
+	// 0, 0, 20, 20
+	ctx.rect(x-width/2, y-height/2, width, height);
+	if ( stroke ) {
+		ctx.strokeStyle = "rgba(0, 0, 255, 0.5)";
+		ctx.stroke();
 	} else {
-		console.log('pointer unlocked');
-		canvasEl.blur();
+		ctx.fillStyle = "#FF0000";
+		ctx.fill();
+	}
+	ctx.closePath();
+}
+
+
+function circle() {
+	ctx.beginPath();
+	ctx.arc(10, 10, 10, 0, Math.PI*2, false);
+	ctx.fillStyle = "green";
+	ctx.fill();
+	ctx.closePath();
+}
+
+function Paddle(x, y, w, h) {
+	this.x = x
+	this.y = y
+	this.width = w
+	this.height = h
+
+	this.dx = 5
+	this.dy = 5
+
+	this.update = function () {
+		if (keyboardState["a"]) {
+			this.x += -this.dx
+		} else if (keyboardState["d"]) {
+			this.x += this.dx
+		}
+	}
+	this.render = function () {
+		rect(this.x, this.y, this.width, this.height)
 	}
 }
 
-document.addEventListener('pointerlockchange', pointerLockChange, false);
+function Brick(x, y, w, h) {
+	this.x = x
+	this.y = y
+	this.width = w
+	this.height = h
+
+	this.update = function () {
+
+	}
+	this.render = function () {
+		rect(this.x, this.y, this.width, this.height)
+	}
+}
+
+function Ball(x, y, radius, dx, dy) {
+	this.x = x
+	this.y = y
+	this.radius = radius
+	this.dx = dx
+	this.dy = dy
+
+	this.update = function () {
+		this.x += this.dx;
+		this.y += this.dy;
+
+		if ( this.x - this.radius < leftBound ) {
+			this.dx = -this.dx
+		} else if ( this.x + this.radius > rightBound ) {
+			this.dx = -this.dx
+		} else if ( this.y - this.radius < topBound ) {
+			this.dy = -this.dy
+		} else if ( this.y + this.radius > bottomBound ) {
+			this.dy = -this.dy
+		}
+	}
+	this.render = function () {
+		ctx.beginPath();
+		ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+		ctx.fillStyle = "#0095DD";
+		ctx.fill();
+		ctx.closePath();
+	}
+}
+
+var leftBound = 0
+var rightBound = canvas.width
+var topBound = 0
+var bottomBound = canvas.height
+
+var centerX = canvas.width/2
+var centerY = canvas.height/2
+
+var ball = new Ball(canvas.width/2, canvas.height-30, 10, 2, -2)
+var paddle = new Paddle(canvas.width/2, canvas.height*0.8, 100, 20)
+
+var objects = []
+
+function generateBricks() {
+	var rows = 6
+	var cols = 10
+
+	var xMargin = 30
+	var yMargin = 20
+
+	var width = canvas.width
+
+	var xSpan = canvas.width - xMargin*2
+	var ySpan = canvas.height/2 - yMargin*2
+
+	var xSpacing = xSpan/(cols-1)
+	var ySpacing = ySpan/(rows-1)
+
+	var xStart = xMargin
+	var yStart = yMargin
+
+	for ( let row = 0; row < rows; row++ ) {
+		for ( let col = 0; col < cols; col++ ) {
+			var brick = new Brick(xStart + col*xSpacing, yStart + row*ySpacing, 40, 20, "color")
+			objects.push(brick)
+		}
+	}
+
+	// var rows = 3
+	// var cols = 10
+	//
+	// var xStart = 0
+	// var yStart = 20
+	//
+	// var xSpacing = 100
+	// var ySpacing = 50
+
+
+
+	// for ( let row = 0; row < rows; row++ ) {
+	// 	for ( let col = 0; col < cols; col++ ) {
+	// 		var brick = new Brick(xStart + col*xSpacing, yStart + row*ySpacing, 80, 40, "color")
+	// 		objects.push(brick)
+	// 	}
+	// }
+}
+
+generateBricks()
+
+objects.push(ball)
+objects.push(paddle)
+
+function update() {
+	if (ball.y + ball.radius > paddle.y + paddle.height) {
+		ball.dy = -ball.dy
+	}
+	if (ball.y - ball.radius < paddle.y - paddle.height) {
+		ball.dy = -ball.dy
+	}
+	if (ball.x + ball.radius > paddle.x - paddle.width) {
+		ball.dx = -ball.dx
+	}
+	if (ball.x - ball.radius < paddle.x + paddle.width) {
+		ball.dx = -ball.dx
+	}
+
+	paddle.height
+
+	for ( let object of objects ) {
+		object.update()
+	}
+}
+
+setInterval(update, 10)
+
+function render() {
+	ctx.clearRect(0, 0, canvas.width, canvas.height)
+	for ( let object of objects ) {
+		object.render()
+	}
+	window.requestAnimationFrame(render)
+}
+
+window.requestAnimationFrame(render)
